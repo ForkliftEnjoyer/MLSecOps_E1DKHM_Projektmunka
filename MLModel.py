@@ -281,6 +281,28 @@ class MLModel:
         sample_data = sample_data.replace('?', np.nan)
 
         sample_data = MLModel.extract_features(sample_data, "Ticket")
+        print("Checking fill_values_nominal:", self.fill_values_nominal)
+        print("Checking onehot_encoders:", self.onehot_encoders)
+        if self.min_max_scaler_dict:
+            for col, scaler in self.min_max_scaler_dict.items():
+                if scaler is None:
+                    print(f"Skipping scaler for {col}: scaler is None")
+                    continue
+                expected_features = getattr(scaler, "feature_names_in_", [col])
+
+                missing = [f for f in expected_features if f not in sample_data.columns]
+                if missing:
+                    print(f"Skipping scaler for {col}: missing columns {missing}")
+                    continue
+
+                try:
+                    scaled = scaler.transform(sample_data[expected_features])
+                    sample_data[expected_features] = scaled
+                except Exception as e:
+                    print(f"Error scaling column {col}: {e}")
+        else:
+            print("Scaler dictionary is not initialized.")
+        print("Checking scaler for:", col, self.min_max_scaler_dict.get(col))
 
         for col in CONTINOUS_COLUMNS:  
             sample_data[col] = pd.to_numeric(sample_data[col], errors='coerce')
@@ -290,14 +312,14 @@ class MLModel:
 
         for col in DISCRETE_COLUMNS:
             sample_data[col].fillna(self.fill_values_discrete[col], inplace=True)
-            sample_data[col] = pd.to_numeric(sample_data[col], errors='coerce').astype(int).astype(object)
+            sample_data[col] = pd.to_numeric(sample_data[col], errors='coerce').astype(int)
 
         for col in CONTINOUS_COLUMNS:
             sample_data[col].fillna(self.fill_values_continuous[col], inplace=True)
 
         sample_data.drop(columns=TEXT_COLUMNS, inplace=True)
 
-        sample_data[BINARY_COLUMNS] = sample_data[BINARY_COLUMNS].astype(int).astype(object)
+        sample_data[BINARY_COLUMNS] = sample_data[BINARY_COLUMNS].astype(int)
 
         for col, encoder in self.onehot_encoders.items():
             new_data = encoder.transform(sample_data[col].to_numpy().reshape(-1, 1))
