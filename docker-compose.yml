@@ -1,0 +1,15 @@
+version: '3'
+services:
+  airflow:
+    image: apache/airflow:latest
+    restart: always
+    environment:
+      - AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=True
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./plugins:/opt/airflow/plugins
+    ports:
+      - "8090:8080"
+    command: ["airflow", "standalone"]
