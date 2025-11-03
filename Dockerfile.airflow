@@ -1,0 +1,6 @@
+# Dockerfile.airflow
+FROM apache/airflow:latest
+
+USER airflow
+# install additional pip dependencies
+RUN /bin/bash -c "pip install mlflow==2.17.0 apache-airflow-providers-smtp"

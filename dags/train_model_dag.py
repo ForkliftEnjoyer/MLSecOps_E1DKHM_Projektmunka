@@ -1,6 +1,6 @@
 from airflow import DAG
-from airflow.operators.python import PythonOperator
-from airflow.operators.email import EmailOperator
+from airflow.providers.standard.operators.python import PythonOperator
+from airflow.operators.bash import BashOperator
 from datetime import datetime, timedelta
 import requests
 import mlflow
@@ -8,21 +8,21 @@ from mlflow import MlflowClient
 import os
 
 # Define the MLflow client
-mlflow.set_tracking_uri("http://127.0.0.1:5102")
+mlflow.set_tracking_uri("http://ml-service:5102")
 client = MlflowClient()
 
 # Set the default model name
-model_name = "Demo_Titanic_Model"
+model_name = "Titanic_Disaster_Model"
 
-# Path to the CSV file
-csv_file_path = "data/train.csv"
+
+csv_file_path = "/opt/airflow/data/train.csv"
 
 def train_model():
-    # Call the train endpoint with the CSV file
     with open(csv_file_path, 'rb') as f:
-        files = {'file': ('data/train.csv', f)}
-        response = requests.post("http://127.0.0.1:8080/model/train", files=files)
-    
+        files = {'file': ('train.csv', f)}
+        response = requests.post("http://ml-service:8080/model/train", files=files)
+        print(response.status_code, response.text)
+
     # Check if the request was successful
     if response.status_code != 200:
         data = response.json()
@@ -59,7 +59,7 @@ def train_model():
 with DAG(
     dag_id="daily_model_training",
     start_date=datetime(2025, 10, 26),
-    schedule_interval="0 18 * * *",  # Runs daily at 2 AM
+    schedule="0 18 * * *",  # Runs daily at 2 AM
     catchup=False,
 ) as dag:
 
@@ -70,13 +70,11 @@ with DAG(
         retries=3,
         retry_delay=timedelta(minutes=5),
     )
-
-    # Define the email notification task
-    notification_task = EmailOperator(
-        task_id="send_notification",
-        to="tomayer16@gmail.com",
-        subject="Model Accuracy Notification",
-        html_content="The new model's accuracy is equal to or lower than the old model's accuracy.",
+    
+    notification_task = BashOperator(
+        task_id="show_notification",
+        bash_command='echo "The new model\'s accuracy is equal to or lower than the old model\'s accuracy."',
+        dag=dag
     )
 
     # Set task dependencies
@@ -84,3 +82,4 @@ with DAG(
 
     # Run notification only if train_and_compare_task returns False
     notification_task.trigger_rule = 'all_done'
+
